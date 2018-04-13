@@ -31,6 +31,48 @@ the content contains a cell with image view. The page control collection view
 cell has two image views for active and inactive state. Finally, the bottom
 collection view cell contains labels for the second part of the content.
 
+```swift
+import UIKit
+
+final class BottomCollectionView: UICollectionView {
+    //1
+    var itemSize: CGSize {
+        return bounds.size
+    }
+}
+```
+```swift
+import UIKit
+
+final class PageControl: UICollectionView {
+    // 1
+    var itemSize: CGSize {
+        return CGSize(width: 60, height: 60)
+    }
+
+    // 2
+    var scale: CGFloat {
+        return bounds.width/itemSize.width
+    }
+
+    // 3
+    var insets: UIEdgeInsets {
+    let inset = (self.bounds.width - itemSize.width)/2
+        return UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
+    }
+}
+```
+```swift
+import UIKit
+
+final class TopCollectionView: UICollectionView {
+    // 1
+    var itemSize: CGSize {
+        return bounds.size
+    }
+}
+```
+
 1.  `itemSize` for `UICollectionViewDelegateFlowLayoutflow` is the method that
 defines item size (the height of the page control item should be less than page
 control collection view height),
@@ -40,6 +82,34 @@ content offset of collection views during scrolling,
 because I want start and finish my page control layout at the center of the page
 control.
 
+```swift
+import UIKit
+
+final class BottomCollectionViewCell: UICollectionViewCell {
+
+    @IBOutlet weak var descriptionLabel: UILabel!
+}
+```
+
+```swift
+import UIKit
+
+final class PageControlCell: UICollectionViewCell {
+
+    @IBOutlet weak var inactiveImageView: UIImageView!
+    @IBOutlet weak var activeImageView: UIImageView!
+}
+```
+
+```swift
+import UIKit
+
+final class TopCollectionViewCell: UICollectionViewCell {
+
+    @IBOutlet weak var imageView: UIImageView!
+}
+```
+
 Collection view cell definitions for each cell with their outlets.
 
 *****
@@ -48,6 +118,89 @@ Collection view cell definitions for each cell with their outlets.
 
 `Pokemon` model defines the object for `PokemonViewModel` that prepares data for
 the `PokemonViewController`.
+
+```swift
+import Foundation
+
+struct Pokemon {
+    let imageName: String
+    let desc: String
+}
+```
+
+```swift
+import Foundation
+
+final class PokemonsViewModel {
+
+    lazy var pokemons: [Pokemon] = {
+    var data: [Pokemon] = []
+    
+    for x in 0..<151 {
+        data.append(
+            Pokemon(
+                    imageName: "\(x + 1)",
+                    desc: "#\(x + 1)")
+                    )}
+            return data
+    }()
+}
+```
+
+```swift
+import UIKit
+
+class BottomCollectionViewDataSource: NSObject, UICollectionViewDataSource {
+
+    var descs: [String]?
+
+func collectionView(_ collectionView: UICollectionView,
+    numberOfItemsInSection section: Int) -> Int {
+    return descs?.count ?? 0
+}
+
+func collectionView(_ collectionView: UICollectionView,
+                    cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    guard let item = collectionView
+                    .dequeueReusableCell(withReuseIdentifier: "cell",
+                                        for: indexPath) as? BottomCollectionViewCell,
+                                        let descs = descs else {
+                                        fatalError()
+                    }
+        let desc = descs[indexPath.item]
+        item.pokemonDescriptionLabel.text = desc
+        return item
+        }
+}
+```
+
+```swift
+import UIKit
+
+class TopCollectionViewDataSource: NSObject, UICollectionViewDataSource {
+
+var imageNames: [String]?
+
+func collectionView(_ collectionView: UICollectionView,
+numberOfItemsInSection section: Int) -> Int {
+return imageNames?.count ?? 0
+}
+
+
+func collectionView(_ collectionView: UICollectionView,
+cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+guard let item = collectionView
+.dequeueReusableCell(withReuseIdentifier: "cell",
+for: indexPath) as? TopCollectionViewCell,
+let imageNames = imageNames else {
+fatalError()
+}
+let imageName = imageNames[indexPath.item]
+item.pokemonImageView.image = UIImage(named: imageName)
+return item
+}
+}
+```
 
 *****
 
@@ -63,6 +216,83 @@ each component.
 *****
 
 #### View Controller
+
+```swift
+import UIKit
+
+class PokemonViewController: UIViewController,
+UICollectionViewDelegateFlowLayout,
+UIScrollViewDelegate {
+
+private var viewModel: PokemonsViewModel? {
+didSet {
+// 2
+(topCollectionView.dataSource as? TopCollectionViewDataSource)?
+.imageNames = viewModel?.pokemons.map { $0.imageName }
+(pageControl.dataSource as? PageControlDataSource)?
+.count = viewModel?.pokemons.count
+(bottomCollectionView.dataSource as? BottomCollectionViewDataSource)?
+.descs = viewModel?.pokemons.map { $0.desc }
+// 3
+topCollectionView.reloadData()
+pageControl.reloadData()
+bottomCollectionView.reloadData()
+}
+}
+
+// MARK: Outlets
+
+@IBOutlet private weak var bottomCollectionView: BottomCollectionView!
+@IBOutlet private weak var topCollectionView: TopCollectionView!
+@IBOutlet private weak var pageControl: PageControl!
+
+override func viewDidLoad() {
+super.viewDidLoad()
+// 1
+viewModel = PokemonsViewModel()
+// 4
+bottomCollectionView.isPagingEnabled = true
+}
+
+// MARK: Collection View Delegate Flow Layout
+// 5
+func collectionView(_ collectionView: UICollectionView,
+layout collectionViewLayout: UICollectionViewLayout,
+sizeForItemAt indexPath: IndexPath) -> CGSize {
+
+switch collectionView {
+case topCollectionView:
+return topCollectionView.itemSize
+case pageControl:
+return pageControl.itemSize
+case bottomCollectionView:
+return bottomCollectionView.itemSize
+default:
+return CGSize.zero
+}
+}
+// 6
+func collectionView(_ collectionView: UICollectionView,
+layout collectionViewLayout: UICollectionViewLayout,
+insetForSectionAt section: Int) -> UIEdgeInsets {
+
+if collectionView == pageControl {
+return pageControl.insets
+}
+return .zero
+}
+
+// MARK: Scroll View Delegate
+// 7
+func scrollViewDidScroll(_ scrollView: UIScrollView) {
+if scrollView == bottomCollectionView {
+let scale = pageControl.scale
+topCollectionView.contentOffset.x = scrollView.contentOffset.x
+pageControl.contentOffset.x = scrollView.contentOffset.x / scale
+}
+}
+}
+```
 
 1.  `PokemonViewModel` initialization after view was loaded,
 1.  assign content for each data source,
@@ -83,6 +313,59 @@ and page control while the bottom collection view is scrolling.
 This paragraph describes the most important `PageControlFlowLayout` class
 definition that makes the page control collection view an awesome custom
 component.
+
+```swift
+import UIKit
+
+class PageControlFlowLayout: UICollectionViewFlowLayout {
+
+// 1
+override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+return true
+}
+
+override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
+// 2
+let attributes = super.layoutAttributesForElements(in: rect)
+// 3
+guard let collectionView = collectionView else {
+return nil
+}
+// 4
+let size = collectionView.bounds.size
+let collectionViewHeight = collectionView.bounds.height
+let contentOffset = collectionView.contentOffset
+let visibleRect = CGRect(origin: contentOffset,
+size: size)
+let absoluteValueRange: CGFloat = 25
+
+attributes?.forEach {
+if $0.frame.intersects(rect) {
+// 5
+let distanceFromCenter = visibleRect.midX - $0.center.x
+let maxY = collectionViewHeight - $0.bounds.height
+// 6
+let cell = currentCellFor(attributes: $0)
+// 7
+if absoluteValueRange < abs(distanceFromCenter) {
+cell?.activeImageView.alpha = 0
+$0.frame.origin.y =  maxY
+return
+}
+// 8
+cell?.activeImageView.alpha = abs((absoluteValueRange - distanceFromCenter)/absoluteValueRange)
+$0.frame.origin.y = abs(distanceFromCenter*maxY/absoluteValueRange)
+}
+}
+return attributes
+}
+
+private func currentCellFor(attributes: UICollectionViewLayoutAttributes) -> PageControlCell? {
+let indexPath = attributes.indexPath
+return collectionView?.cellForItem(at: indexPath) as? PageControlCell
+}
+}
+```
 
 1.  return `true` if you want to always change layout when items change position,
 1.  get all attributes in the collection view content size,
