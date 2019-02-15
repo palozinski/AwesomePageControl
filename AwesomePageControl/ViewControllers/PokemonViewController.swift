@@ -4,6 +4,10 @@ class PokemonViewController: UIViewController,
                              UICollectionViewDelegateFlowLayout,
                              UIScrollViewDelegate {
     
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
+    
     private var viewModel: PokemonsViewModel? {
         didSet {
             // 2
@@ -51,6 +55,7 @@ class PokemonViewController: UIViewController,
             return CGSize.zero
         }
     }
+    
     // 6
     func collectionView(_ collectionView: UICollectionView,
                         layout collectionViewLayout: UICollectionViewLayout,
